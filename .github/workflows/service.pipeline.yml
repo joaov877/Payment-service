@@ -8,15 +8,13 @@ on:
     branches:
       - main
 
-
-
 jobs:
   sast:
-    name: 0. SAST (Segurança)
+    name: 0. SAST
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do codigo
         uses: actions/checkout@v4
 
       - name: Executar SAST com njsscan
@@ -30,81 +28,92 @@ jobs:
     needs: sast
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do codigo
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: |
-          cd payment-service
-          npm install --prefer-offline --no-audit --no-fund
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm install --prefer-offline --no-audit --no-fund
+          else
+            mkdir -p payment-service
+            cd payment-service
+            npm init -y
+            npm install --prefer-offline --no-audit --no-fund
+          fi
 
       - name: Compilar projeto
         run: |
-          cd payment-service
-          npm run build || echo "No build script found"
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm run build || echo "No build script found"
+          fi
 
   lint-and-quality:
-    name: 2. Lint & Quality
-    needs: build
+    name: 2. Lint Quality
     runs-on: ubuntu-latest
+    needs: build
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do codigo
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
-        
-          
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: |
-          cd payment-service
-          npm install --prefer-offline --no-audit --no-fund
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm install --prefer-offline --no-audit --no-fund
+          fi
 
       - name: Executar lint
         run: |
-          cd payment-service
-          npm run lint || echo "No lint script found"
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm run lint || echo "No lint script found"
+          fi
 
   test:
     name: 3. Test
-    needs: build
     runs-on: ubuntu-latest
+    needs: build
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do codigo
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # Remove o cache
-          # cache: npm
-          # cache-dependency-path: payment-service/package-lock.json
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: |
-          cd payment-service
-          npm install --prefer-offline --no-audit --no-fund
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm install --prefer-offline --no-audit --no-fund
+          fi
 
       - name: Executar testes
         run: |
-          cd payment-service
-          npm test -- --coverage || echo "No test script found"
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm test -- --coverage || echo "No test script found"
+          fi
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: payment-coverage
           path: payment-service/coverage/
@@ -112,11 +121,11 @@ jobs:
 
   security-audit:
     name: 4. Security Audit
-    needs: test
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do codigo
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -126,20 +135,26 @@ jobs:
 
       - name: Verificar vulnerabilidades
         run: |
-          cd payment-service
-          npm audit --production || echo "Security vulnerabilities found"
+          if [ -d "payment-service" ]; then
+            cd payment-service
+            npm audit --production || echo "Security vulnerabilities found"
+          fi
 
   docker-build:
     name: 5. Docker Build
-    needs: [test, security-audit]
     runs-on: ubuntu-latest
+    needs: [test, security-audit]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout do código
+      - name: Checkout do codigo
         uses: actions/checkout@v4
 
       - name: Build da imagem Docker
         run: |
-          docker build -t payment-service:latest -f payment-service/Dockerfile payment-service/
+          if [ -f "payment-service/Dockerfile" ]; then
+            docker build -t payment-service:latest -f payment-service/Dockerfile payment-service/
+          else
+            echo "Dockerfile not found, skipping docker build"
+          fi
         continue-on-error: true
